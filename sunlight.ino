@@ -1,28 +1,20 @@
-#include <Wire.h>
 #include <WiFiNINA.h>
-#include <BH1750FVI.h>
 
-char ssid[] = "Rajveer";
+char ssid[] = "12345678";
 char pass[] = "12345678";
 const char* webhookUrl = "/trigger/sunlight_alert/with/key/inE9LYrR33VIVO4bHklquzgYacVVtpPMaozwNRMB0Tn";
 
 WiFiClient client;
 
-// Create an instance of the BH1750 object
-BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
-
-// Define the light threshold in Lux
-const int lightThreshold = 400;
+// Pin connected to the LM393 digital output
+const int LIGHT_SENSOR_PIN = 2;
 
 void setup() {
   Serial.begin(9600);
   while (!Serial);
 
-  // Initialize I2C communication for the light sensor
-  Wire.begin();
-  
-  // Initialize BH1750 sensor
-  LightSensor.begin();
+  // Initialize the light sensor pin
+  pinMode(LIGHT_SENSOR_PIN, INPUT);
   
   // Connect to WiFi
   WiFi.begin(ssid, pass);
@@ -43,41 +35,46 @@ void setup() {
 }
 
 void loop() {
-  // Read the light sensor value in Lux
-  int lightValue = LightSensor.GetLightIntensity();
-  Serial.print("Light Sensor Value (Lux): ");
-  Serial.println(lightValue);
+  // Read the light sensor value (HIGH for light, LOW for dark)
+  int lightValue = digitalRead(LIGHT_SENSOR_PIN);
+  Serial.print("Light Sensor State: ");
+  Serial.println(lightValue == HIGH ? "Bright" : "Dark");
 
-  // Check if the light value exceeds the threshold
-  if (lightValue > lightThreshold) {
+  // Check if the light value is high (light detected)
+  if (lightValue == HIGH) {
     sendIFTTTNotification("Sunlight detected on the terrarium!");
   } else {
     sendIFTTTNotification("Sunlight stopped.");
   }
 
   // Wait before the next check
-  delay(60000);  // 60 seconds delay
+  delay(60000);
 }
 
 void sendIFTTTNotification(String message) {
   String queryString = "?value1=" + message;
 
-  // Make an HTTP GET request to the IFTTT webhook URL
-  client.println("GET " + String(webhookUrl) + queryString + " HTTP/1.1");
-  client.println("Host: maker.ifttt.com");
-  client.println("Connection: close");
-  client.println(); // End of HTTP header
+  // Connect to IFTTT and send an HTTP GET request
+  if (client.connect("maker.ifttt.com", 80)) {
+    Serial.println("Sending notification...");
+    client.println("GET " + String(webhookUrl) + queryString + " HTTP/1.1");
+    client.println("Host: maker.ifttt.com");
+    client.println("Connection: close");
+    client.println(); // End of HTTP header
 
-  // Read the server response
-  while (client.connected()) {
-    if (client.available()) {
-      char c = client.read();
-      Serial.print(c);
+    // Read the server response
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        Serial.print(c);
+      }
     }
+    
+    // Disconnect from the server
+    client.stop();
+    Serial.println();
+    Serial.println("Disconnected from server");
+  } else {
+    Serial.println("Failed to connect to IFTTT server");
   }
-
-  // Disconnect from the server
-  client.stop();
-  Serial.println();
-  Serial.println("Disconnected from server");
 }
