@@ -42,9 +42,9 @@ void loop() {
 
   // Check if the light value is high (light detected)
   if (lightValue == HIGH) {
-    sendIFTTTNotification("Sunlight detected on the terrarium!");
+    sendIFTTTNotification("Bright");
   } else {
-    sendIFTTTNotification("Sunlight stopped.");
+    sendIFTTTNotification("Dark");
   }
 
   // Wait before the next check
